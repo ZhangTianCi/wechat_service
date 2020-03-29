@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JavaType;
 import priv.asura.wechat_service.utils.DESUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import priv.asura.wechat_service.global.ServiceException;
 import org.springframework.beans.factory.annotation.Value;
 import priv.asura.wechat_service.utils.SymmetricEncryptionInterface;
 
@@ -44,12 +45,12 @@ public abstract class DataService {
      * @return -
      * @throws Exception -
      */
-    public <T> T readData(Class<T> valueType) throws Exception {
+    public <T> T readData(Class<T> valueType) throws ServiceException {
         try {
             byte[] data = readData();
             return objectMapper.readValue(data, valueType);
-        } catch (Exception e) {
-            throw new Exception("获取数据失败", e);
+        } catch (IOException e) {
+            throw new ServiceException("获取数据失败", e);
         }
     }
 
@@ -61,13 +62,13 @@ public abstract class DataService {
      * @return -
      * @throws Exception -
      */
-    protected <T> ArrayList<T> readDataWhitList(Class<T> valueType) throws Exception {
+    protected <T> ArrayList<T> readDataWhitList(Class<T> valueType) throws ServiceException {
         try {
             byte[] data = readData();
             JavaType javaType = objectMapper.getTypeFactory().constructParametricType(ArrayList.class, valueType);
             return objectMapper.readValue(data, javaType);
-        } catch (Exception e) {
-            throw new Exception("获取数据失败", e);
+        } catch (IOException e) {
+            throw new ServiceException("获取数据失败", e);
         }
     }
 
@@ -77,12 +78,12 @@ public abstract class DataService {
      * @param object -
      * @throws Exception -
      */
-    protected void writeData(Object object) throws Exception {
+    protected void writeData(Object object) throws ServiceException {
         try {
             byte[] data = objectMapper.writeValueAsBytes(object);
             saveData(data);
         } catch (Exception e) {
-            throw new Exception("保存数据失败", e);
+            throw new ServiceException("保存数据失败", e);
         }
     }
 
