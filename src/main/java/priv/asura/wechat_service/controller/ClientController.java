@@ -27,21 +27,18 @@ public class ClientController {
     }
 
     @PostMapping("create")
-    public ApiResult create(@RequestBody Map infos) {
-        ClientService clientService = clientProxyService.getInstance(new Client() {{
-            setInfos(infos);
-            setId(getClientId());
-            setSecret(getClientSecret());
-        }});
+    public ApiResult create(@RequestBody Object infos) {
+        Client client = getClient();
+        client.setInfos(infos);
+        ClientService clientService = clientProxyService.getInstance(client);
         clientService.create();
         return ApiResult.success();
     }
 
-    public String getClientId() {
-        return request.getHeader("client-id");
-    }
-
-    public String getClientSecret() {
-        return request.getHeader("client-secret");
+    public Client getClient() {
+        return new Client() {{
+            setId(request.getHeader("client-id"));
+            setSecret(request.getHeader("client-secret"));
+        }};
     }
 }

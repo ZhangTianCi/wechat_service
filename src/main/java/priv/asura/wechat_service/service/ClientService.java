@@ -106,6 +106,8 @@ public class ClientService {
                     String secretCipher = BCrypt.withDefaults().hashToString(10, getSecret().toCharArray());
                     fileUtil.write(getSecretCipherPath(), secretCipher.getBytes());
                     fileUtil.write(getClientInfoPath(), new DESUtil(getSecret()).encrypt(infoString.getBytes()));
+                    // 创建其它目录
+                    new File(Paths.get(getResourcePath(), "wechat_access_token").toString()).mkdir();
                 }
             }
         } catch (ServiceException e) {

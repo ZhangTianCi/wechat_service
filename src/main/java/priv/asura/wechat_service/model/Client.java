@@ -22,9 +22,9 @@ public class Client implements Serializable {
     /**
      * 其它信息
      */
-    private Map<String, Object> infos;
+    private Object infos;
 
-    public Map<String, Object> getInfos() {
+    public Object getInfos() {
         if (infos == null) {
             return new HashMap<>(0);
         } else {
