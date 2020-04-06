@@ -6,40 +6,42 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import priv.asura.wechat_service.global.ApiResult;
 import priv.asura.wechat_service.model.Client;
-import priv.asura.wechat_service.service.ClientDataService;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
+import priv.asura.wechat_service.service.ClientProxyService;
+import priv.asura.wechat_service.service.ClientService;
 
-import java.util.ArrayList;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/client")
 public class ClientController {
 
-    final ClientDataService clientDataService;
+    final ClientProxyService clientProxyService;
 
     final HttpServletRequest request;
 
-    public ClientController(HttpServletRequest request, ClientDataService clientDataService) {
+    public ClientController(HttpServletRequest request, ClientProxyService clientProxyService) {
         this.request = request;
-        this.clientDataService = clientDataService;
+        this.clientProxyService = clientProxyService;
     }
 
-    @RequestMapping("init")
-    public ApiResult init() throws Exception {
-        clientDataService.init();
+    @PostMapping("create")
+    public ApiResult create(@RequestBody Map infos) {
+        ClientService clientService = clientProxyService.getInstance(new Client() {{
+            setInfos(infos);
+            setId(getClientId());
+            setSecret(getClientSecret());
+        }});
+        clientService.create();
         return ApiResult.success();
     }
 
-    @RequestMapping({"/", "list"})
-    public ApiResult list() throws Exception {
-
-        return ApiResult.success(clientDataService.getClients());
+    public String getClientId() {
+        return request.getHeader("client-id");
     }
 
-    @PostMapping("add")
-    public ApiResult add(@RequestBody Client client) throws Exception {
-        clientDataService.add(client);
-        return ApiResult.success();
+    public String getClientSecret() {
+        return request.getHeader("client-secret");
     }
 }

@@ -38,6 +38,6 @@ public class AccessToken {
      * @return 有效性
      */
     public boolean isValid() {
-        return getErrorCode().equals(0) && new Date(generateTime + (getExpiresIn() * 1000)).after(new Date());
+        return (getErrorCode() == null || getErrorCode().equals(0)) && new Date(generateTime + (getExpiresIn() * 1000)).after(new Date());
     }
 }

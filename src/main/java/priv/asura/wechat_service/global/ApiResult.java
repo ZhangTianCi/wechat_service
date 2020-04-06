@@ -48,7 +48,7 @@ public class ApiResult {
      * @param errMessage api message
      * @return result
      */
-    static ApiResult fail(int errCode, String errMessage) {
+    public static ApiResult fail(int errCode, String errMessage) {
         return new ApiResult() {{
             setCode(errCode);
             setMessage(errMessage);
