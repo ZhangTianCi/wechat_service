@@ -35,7 +35,7 @@ public class ClientService {
         }
         id = id.trim();
         if (id.length() < 16 || id.length() > 64) {
-            throw new ServiceException("使用者编码为空长度超出限制[32,64]");
+            throw new ServiceException("使用者编码长度超出限制[32,64]");
         }
         return id;
     }
