@@ -39,9 +39,7 @@ public class ClientTest {
 
     @Test
     public void createClient() {
-        HttpEntity<Map> requestEntity = new HttpEntity<>(new HashMap(2) {{
-            put("name", "测试");
-        }}, requestHeaders);
+        HttpEntity<HashMap> requestEntity = new HttpEntity<>(new HashMap(0), requestHeaders);
         ResponseEntity<String> responseEntity = restTemplate.postForEntity(this.base.toString() + "/client/create", requestEntity, String.class);
         System.out.println(String.format("测试结果为：%s", responseEntity.getBody()));
     }
