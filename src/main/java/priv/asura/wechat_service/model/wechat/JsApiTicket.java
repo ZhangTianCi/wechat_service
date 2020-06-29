@@ -1,5 +1,6 @@
 package priv.asura.wechat_service.model.wechat;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -40,6 +41,7 @@ public class JsApiTicket {
      *
      * @return 有效性
      */
+    @JsonIgnore
     public boolean isValid() {
         return (getErrorCode() == null || getErrorCode().equals(0)) && new Date(generateTime + (getExpiresIn() * 1000)).after(new Date());
     }

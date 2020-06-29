@@ -2,6 +2,7 @@ package priv.asura.wechat_service.model.wechat;
 
 import java.util.Date;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -37,6 +38,7 @@ public class AccessToken {
      *
      * @return 有效性
      */
+    @JsonIgnore
     public boolean isValid() {
         return (getErrorCode() == null || getErrorCode().equals(0)) && new Date(generateTime + (getExpiresIn() * 1000)).after(new Date());
     }
