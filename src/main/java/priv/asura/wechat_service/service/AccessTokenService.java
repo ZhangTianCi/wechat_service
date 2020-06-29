@@ -59,7 +59,7 @@ public class AccessTokenService {
             if (apiResult.getErrorCode() != null && apiResult.getErrorCode() != 0) {
                 throw new ServiceException(apiResult.getErrorMessage());
             } else {
-                FileUtil.writeUtf8String(result, getFilePath());
+                FileUtil.writeUtf8String(new ObjectMapper().writeValueAsString(apiResult), getFilePath());
             }
         } catch (ServiceException e) {
             throw e;
