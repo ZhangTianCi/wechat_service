@@ -1,11 +1,14 @@
 package priv.asura.wechat_service;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.ApplicationPidFileWriter;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class Application {
     public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
+        SpringApplication springApplication = new SpringApplication(Application.class);
+        springApplication.addListeners(new ApplicationPidFileWriter());
+        springApplication.run(args);
     }
 }
