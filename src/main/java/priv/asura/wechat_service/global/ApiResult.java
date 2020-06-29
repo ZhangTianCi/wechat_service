@@ -18,6 +18,10 @@ public class ApiResult {
      */
     private final static String SUCCESS_MESSAGE = "success";
     /**
+     * Default code of api call result  when fail
+     */
+    private final static int FAIL_CODE = 500;
+    /**
      * Code of api call result
      */
     int code;
@@ -52,6 +56,13 @@ public class ApiResult {
         return new ApiResult() {{
             setCode(errCode);
             setMessage(errMessage);
+        }};
+    }
+
+    public static ApiResult fail(Exception exception) {
+        return new ApiResult() {{
+            setCode(FAIL_CODE);
+            setMessage(exception.getMessage());
         }};
     }
 

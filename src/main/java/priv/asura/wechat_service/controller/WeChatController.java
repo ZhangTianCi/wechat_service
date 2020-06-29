@@ -1,237 +1,89 @@
 package priv.asura.wechat_service.controller;
 
-import at.favre.lib.crypto.bcrypt.BCrypt;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.DigestUtils;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import priv.asura.wechat_service.global.ApiResult;
-import priv.asura.wechat_service.global.ServiceException;
-import priv.asura.wechat_service.model.Client;
-import priv.asura.wechat_service.model.wechat.AccessToken;
-import priv.asura.wechat_service.model.wechat.Account;
-import priv.asura.wechat_service.model.wechat.JsApiTicket;
-import priv.asura.wechat_service.utils.DESUtil;
-import priv.asura.wechat_service.utils.FileUtil;
-import priv.asura.wechat_service.utils.HttpUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import priv.asura.wechat_service.service.MicroMessengerService;
+import priv.asura.wechat_service.service.MicroMessengerProxyService;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
-@RequestMapping("/we_chat")
-public class WeChatController extends AccountController {
+@RequestMapping("/tencent")
+public class WeChatController extends BaseController {
+    @Autowired
+    MicroMessengerProxyService microMessengerProxyService;
 
     public WeChatController(HttpServletRequest request) {
         super(request);
     }
 
-    @Override
-    String getAccountType() {
-        return "we_chat";
-    }
 
-    @PostMapping("")
-    public ApiResult create(@RequestBody(required = false) Account account) {
-        if (account == null) {
-            return ApiResult.fail(500, "账号信息不能为空");
-        }
-        Map<String, String> accounts = getAccounts();
-        // MD5账号id
-        String accountKey = DigestUtils.md5DigestAsHex(account.getId().getBytes());
-        // 账号已存在
-        if (accounts != null && accounts.containsKey(accountKey)) {
-            // 账号信息目录
-            String accountDirectoryPath = Paths.get(resourcesDirectory, getClientPath()).toString();
-            String appIdPath = Paths.get(accountDirectoryPath, "app_id.txt").toString();
-            String appSecretPath = Paths.get(accountDirectoryPath, "app_secret.txt").toString();
-            if (!new File(appIdPath).exists()) {
-                return ApiResult.fail(501, "appId信息丢失");
+    @PostMapping("/micro_messenger/{id}")
+    public ApiResult create(@PathVariable(value = "id", required = false) String appId, @RequestBody(required = false) String secret) {
+        try {
+            if (StrUtil.isBlank(appId)) {
+                throw new RuntimeException("appId不能为空");
             }
-            if (!new File(appSecretPath).exists()) {
-                return ApiResult.fail(501, "appSecret信息丢失");
+            if (StrUtil.isBlank(secret)) {
+                throw new RuntimeException("secret不能为空");
+            }
+            MicroMessengerService microMessengerService = microMessengerProxyService.getInstance(appId);
+            if (microMessengerService.create()) {
+                microMessengerService.writeSecret(secret);
+            } else {
+                return ApiResult.fail(500, "资源目录创建失败");
             }
             return ApiResult.success();
+        } catch (Exception e) {
+            log.warn("微信信息创建失败", e);
+            return ApiResult.fail(e);
         }
-        // 账号不存在
-        else {
-            String tempPath = generateDirectoryName();
-            // 账号信息目录
-            String clientDirectoryPath = Paths.get(resourcesDirectory, getClientPath(), "we_chat", tempPath).toString();
-            String appIdPath = Paths.get(clientDirectoryPath, "app_id.txt").toString();
-            String appSecretPath = Paths.get(clientDirectoryPath, "app_secret.txt").toString();
-            boolean directoryCreated = new File(clientDirectoryPath).mkdir();
-            if (!directoryCreated) {
-                return ApiResult.fail(501, "资源目录创建失败");
-            } else {
-                fileUtil.write(appIdPath, getDESUtil().encrypt(account.getAppId().getBytes()));
-                fileUtil.write(appSecretPath, getDESUtil().encrypt(account.getAppSecret().getBytes()));
-                saveAccount(accountKey, tempPath);
-                return ApiResult.success();
+    }
+
+    @GetMapping("micro_messenger/access_token/{id}")
+    public ApiResult accessToken(@PathVariable(value = "id", required = false) String appId) {
+        MicroMessengerService microMessengerService = microMessengerProxyService.getInstance(appId);
+        return ApiResult.success(microMessengerService.getAccessToken());
+    }
+
+    @GetMapping("micro_messenger/js_api_ticket/{id}")
+    public ApiResult jsTicket(@PathVariable(value = "id", required = false) String appId) {
+        MicroMessengerService microMessengerService = microMessengerProxyService.getInstance(appId);
+        return ApiResult.success(microMessengerService.getJsApiTicket());
+    }
+
+    @GetMapping("micro_messenger/web_code/{id}")
+    public ApiResult webCode(@PathVariable(value = "id", required = false) String appId, @RequestParam(value = "code", required = false) String code) {
+
+        try {
+            if (StrUtil.isBlank(appId)) {
+                throw new RuntimeException("appId不能为空");
             }
-        }
-    }
-
-    @GetMapping("access_token")
-    public ApiResult accessToken(String accountId) {
-        return ApiResult.success(getAccessTokenValue(accountId));
-    }
-
-    @GetMapping("js_api_ticket")
-    public ApiResult jsTicket(String accountId) {
-        return ApiResult.success(getJsApiTicketValue(accountId));
-    }
-
-    @GetMapping("web_code")
-    public ApiResult webCode(String accountId, String code) {
-        return ApiResult.success();
-    }
-
-
-    /**
-     * 获取AccessToken
-     *
-     * @param accountId 账号id
-     * @return access_token's value.
-     */
-    private String getAccessTokenValue(String accountId) {
-        try {
-            return getAccessTokenValueFromCache(accountId);
-        } catch (Exception e) {
-            refreshAccessToken(accountId);
-        }
-        return getAccessTokenValueFromCache(accountId);
-    }
-
-    /**
-     * 通过调用微信接口刷新 access_token.
-     *
-     * @param accountId 账号id
-     */
-    private void refreshAccessToken(String accountId) {
-        String appId = getAppId(accountId);
-        String appSecret = getAppSecret(accountId);
-        String url = String.format("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", appId, appSecret);
-        try {
-            String result = new HttpUtil(HttpUtil.Method.GET, url).send("UTF-8");
-            AccessToken apiResult = new ObjectMapper().readValue(result, AccessToken.class);
-            if (apiResult.getErrorCode() != null && apiResult.getErrorCode() != 0) {
-                throw new ServiceException(apiResult.getErrorMessage());
-            } else {
-                String accessTokenPath = Paths.get(getAccountDirectoryPath(accountId), "access_token.txt").toString();
-                fileUtil.write(accessTokenPath, getDESUtil().encrypt(result.getBytes()));
+            if (StrUtil.isBlank(code)) {
+                throw new RuntimeException("code不能为空");
             }
-        } catch (ServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServiceException("刷新失败", e);
-        }
-    }
-
-    /**
-     * 从硬盘获取access_token's value.
-     *
-     * @param accountId 账号id
-     * @return AccessToken
-     */
-    private String getAccessTokenValueFromCache(String accountId) {
-        String accessTokenPath = Paths.get(getAccountDirectoryPath(accountId), "access_token.txt").toString();
-        try {
-            byte[] result = getDESUtil().decrypt(fileUtil.getByte(accessTokenPath));
-            AccessToken accessToken = new ObjectMapper().readValue(result, AccessToken.class);
-            if (accessToken.isValid()) {
-                return accessToken.getAccessToken();
-            } else {
-                throw new ServiceException("缓存已失效");
+            MicroMessengerService microMessengerService = microMessengerProxyService.getInstance(appId);
+            String url = StrUtil.format("https://api.weixin.qq.com/sns/oauth2/access_token?appid={}&secret={}&code={}&grant_type=authorization_code", appId, microMessengerService.getSecret(), code);
+            String apiResultString = HttpUtil.get(url);
+            Map<String, Object> apiResult = objectMapper.readValue(apiResultString, Map.class);
+            String accessTokenTemp = apiResult.getOrDefault("access_token", "").toString();
+            String openId = apiResult.getOrDefault("access_token", "").toString();
+            if (StrUtil.isBlank(accessTokenTemp) || StrUtil.isBlank(openId)) {
+                throw new RuntimeException("中间步骤出错");
             }
+            url = StrUtil.format("https://api.weixin.qq.com/sns/userinfo?access_token={}&openid={}&lang=zh_CN", accessTokenTemp, code);
+            String infoString = HttpUtil.get(url);
+            HashMap<String, Object> info = objectMapper.readValue(infoString, HashMap.class);
+            return ApiResult.success(info);
         } catch (Exception e) {
-            throw new ServiceException("从硬盘获取失败", e);
+            return ApiResult.fail(e);
         }
-    }
-
-    /**
-     * 获取AccessToken
-     *
-     * @param accountId 账号id
-     * @return access_token's value.
-     */
-    private String getJsApiTicketValue(String accountId) {
-        try {
-            return getJsApiTicketValueFromCache(accountId);
-        } catch (Exception e) {
-            refreshJsApiTicket(accountId);
-        }
-        return getJsApiTicketValueFromCache(accountId);
-    }
-
-    /**
-     * 通过调用微信接口刷新 js_api_ticket.
-     *
-     * @param accountId 账号id
-     */
-    private void refreshJsApiTicket(String accountId) {
-        String url = String.format("https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=%s&type=jsapi", getAccessTokenValue(accountId));
-        try {
-            String result = new HttpUtil(HttpUtil.Method.GET, url).send("UTF-8");
-            JsApiTicket apiResult = new ObjectMapper().readValue(result, JsApiTicket.class);
-            if (apiResult.getErrorCode() != null && apiResult.getErrorCode() != 0) {
-                throw new ServiceException(apiResult.getErrorMessage());
-            } else {
-                String accessTokenPath = Paths.get(getAccountDirectoryPath(accountId), "js_api_ticket.txt").toString();
-                fileUtil.write(accessTokenPath, getDESUtil().encrypt(result.getBytes()));
-            }
-        } catch (ServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServiceException("刷新失败", e);
-        }
-    }
-
-    /**
-     * 从硬盘获取js_api_ticket's value.
-     *
-     * @param accountId 账号id
-     * @return AccessToken
-     */
-    private String getJsApiTicketValueFromCache(String accountId) {
-        String accessTokenPath = Paths.get(getAccountDirectoryPath(accountId), "js_api_ticket.txt").toString();
-        try {
-            byte[] result = getDESUtil().decrypt(fileUtil.getByte(accessTokenPath));
-            JsApiTicket accessToken = new ObjectMapper().readValue(result, JsApiTicket.class);
-            if (accessToken.isValid()) {
-                return accessToken.getTicket();
-            } else {
-                throw new ServiceException("缓存已失效");
-            }
-        } catch (Exception e) {
-            throw new ServiceException("从硬盘获取失败", e);
-        }
-    }
-
-    /**
-     * 获取appId
-     *
-     * @param accountId 账号id
-     * @return appId
-     */
-    private String getAppId(String accountId) {
-        String filePath = Paths.get(getAccountDirectoryPath(accountId), "app_id.txt").toString();
-        return new String(getDESUtil().decrypt(fileUtil.getByte(filePath)));
-    }
-
-    /**
-     * 获取appSecret
-     *
-     * @param accountId 账号id
-     * @return appSecret
-     */
-    private String getAppSecret(String accountId) {
-        String filePath = Paths.get(getAccountDirectoryPath(accountId), "app_secret.txt").toString();
-        return new String(getDESUtil().decrypt(fileUtil.getByte(filePath)));
     }
 }

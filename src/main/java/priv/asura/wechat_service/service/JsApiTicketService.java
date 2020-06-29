@@ -7,16 +7,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import priv.asura.wechat_service.global.ServiceException;
-import priv.asura.wechat_service.model.wechat.AccessToken;
+import priv.asura.wechat_service.model.wechat.JsApiTicket;
 
 import java.nio.file.Paths;
 
 @Slf4j
-public class AccessTokenService {
+public class JsApiTicketService {
 
     private String appId;
-    private String appSecret;
-    private String resourcesDirectory;
+    String resourcesDirectory;
+    private AccessTokenService accessTokenService;
 
     /**
      * 构造函数
@@ -24,10 +24,10 @@ public class AccessTokenService {
      * @param appId
      * @param appSecret
      */
-    public AccessTokenService(String resourcesDirectory, String appId, String appSecret) {
+    public JsApiTicketService(String resourcesDirectory, String appId, String appSecret) {
         this.appId = appId;
-        this.appSecret = appSecret;
         this.resourcesDirectory = resourcesDirectory;
+        accessTokenService = new AccessTokenService(resourcesDirectory, appId, appSecret);
     }
 
     /**
@@ -40,12 +40,12 @@ public class AccessTokenService {
     }
 
     /**
-     * 获取AccessToken存储路径
+     * 获取JsApiTicket存储路径
      *
      * @return -
      */
     public String getFilePath() {
-        return Paths.get(this.getResourcePath(), ".access_token").toString();
+        return Paths.get(this.getResourcePath(), ".js_api_ticket").toString();
     }
 
     /**
@@ -53,9 +53,10 @@ public class AccessTokenService {
      */
     private void refresh() {
         try {
-            String url = StrUtil.format("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={}&secret={}", appId, appSecret);
+            String accessToken = accessTokenService.get();
+            String url = StrUtil.format("https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token={}&type=jsapi", accessToken);
             String result = HttpUtil.get(url);
-            AccessToken apiResult = new ObjectMapper().readValue(result, AccessToken.class);
+            JsApiTicket apiResult = new ObjectMapper().readValue(result, JsApiTicket.class);
             if (apiResult.getErrorCode() != null && apiResult.getErrorCode() != 0) {
                 throw new ServiceException(apiResult.getErrorMessage());
             } else {
@@ -76,9 +77,9 @@ public class AccessTokenService {
     private String getFromCache() {
         try {
             String result = FileUtil.readUtf8String(getFilePath());
-            AccessToken accessToken = new ObjectMapper().readValue(result, AccessToken.class);
-            if (accessToken.isValid()) {
-                return accessToken.getAccessToken();
+            JsApiTicket jsApiTicket = new ObjectMapper().readValue(result, JsApiTicket.class);
+            if (jsApiTicket.isValid()) {
+                return jsApiTicket.getTicket();
             } else {
                 throw new ServiceException("缓存已失效");
             }
@@ -88,9 +89,9 @@ public class AccessTokenService {
     }
 
     /**
-     * 获取AccessToken
+     * 获取JsApiTicket
      *
-     * @return AccessToken
+     * @return JsApiTicket
      */
     public String get() {
         try {
