@@ -74,7 +74,7 @@ public class WeChatController extends BaseController {
             String apiResultString = HttpUtil.get(url);
             Map<String, Object> apiResult = objectMapper.readValue(apiResultString, Map.class);
             String accessTokenTemp = apiResult.getOrDefault("access_token", "").toString();
-            String openId = apiResult.getOrDefault("access_token", "").toString();
+            String openId = apiResult.getOrDefault("openid", "").toString();
             if (StrUtil.isBlank(accessTokenTemp) || StrUtil.isBlank(openId)) {
                 throw new RuntimeException("中间步骤出错");
             }
